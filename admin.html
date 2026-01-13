@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+  <style>
+    body { background-color: #0B0B0B; color: #D6B15A; padding: 20px; }
+    .order-card { background: #171717; border-left: 10px solid #B08A3A; border-radius: 15px; padding: 20px; margin-bottom: 20px; }
+    .token-seq { font-size: 2.2rem; font-weight: 900; color: #D6B15A; }
+    .status-badge { padding: 3px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; color: #fff; }
+    .status-paid { background: #2563eb; } .status-ready { background: #16a34a; } .status-pending { background: #b91c1c; }
+    .stat-box { background: #171717; border: 1px solid #3A2B1C; border-radius: 15px; padding: 15px; text-align: center; }
+    #customModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 2000; }
+    .modal-box { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: #171717; border: 2px solid #D6B15A; padding: 30px; border-radius: 15px; text-align: center; width: 85%; max-width: 400px; }
+  </style>
+</head>
+<body>
+  <audio id="chime" src="https://actions.google.com/sounds/v1/alarms/beep_short.ogg"></audio>
+  <div class="container">
+    <h2 class="fw-bold mb-4">TWIST & TOAST - Kitchen</h2>
+    <div class="row mb-4">
+      <div class="col-6 col-md-3"><div class="stat-box"><small>ORDERS TODAY</small><h2 id="stat-count">0</h2></div></div>
+      <div class="col-6 col-md-3"><div class="stat-box"><small>REVENUE TODAY</small><h2 id="stat-revenue" style="color:#D6B15A;">₹0</h2></div></div>
+    </div>
+    <div id="admin-container" class="row"></div>
+  </div>
+  <div id="customModal"><div class="modal-box"><h4 id="modalTitle" style="color:#D6B15A;">Update Order?</h4><div class="d-flex gap-2 mt-4"><button onclick="executeAction()" class="btn btn-warning w-100">YES</button><button onclick="closeModal()" class="btn btn-outline-secondary w-100">NO</button></div></div></div>
+
+  <script>
+    let lastCount = -1, curToken = null, curAction = "";
+    window.onload = function () { load(); refreshStats(); setInterval(() => { load(); refreshStats(); }, 20000); };
+    function refreshStats() { google.script.run.withSuccessHandler(s => { document.getElementById('stat-count').innerText = s.count; document.getElementById('stat-revenue').innerText = "₹" + s.revenue; }).getDailyStats(); }
+    function load() { google.script.run.withSuccessHandler(renderLive).getPendingOrders(); }
+    function renderLive(orders) {
+      if (lastCount !== -1 && orders.length > lastCount) document.getElementById('chime').play();
+      lastCount = orders.length; let h = '';
+      orders.forEach(o => {
+        let btn, cancelBtn = `<button onclick="openModal('${o.token}','cancel')" class="btn btn-outline-danger btn-sm w-100 mt-2">CANCEL ORDER</button>`;
+        if (o.status.includes("Pending")) btn = `<button onclick="openModal('${o.token}','pay')" class="btn btn-info w-100 mt-3 py-2">CONFIRM PAYMENT</button>`;
+        else if (o.status === "Paid") btn = `<button onclick="openModal('${o.token}','ready')" class="btn btn-success w-100 mt-3 py-2">FOOD IS READY</button>`;
+        else { btn = `<button onclick="openModal('${o.token}','deliver')" class="btn btn-warning w-100 mt-3 py-2">MARK DELIVERED</button>`; cancelBtn = ''; }
+
+        h += `<div class="col-md-4"><div class="order-card">
+          <div class="d-flex justify-content-between"><strong>#${o.token}</strong><small style="color:#D6B15A; font-weight:bold;">${o.time}</small></div>
+          <div class="mt-2">${o.name} <span class="status-badge status-${o.status.toLowerCase().split(' ')[0]}">${o.status}</span></div>
+          <div style="color:#fff; opacity:0.9;">Phone: ${o.phone || '—'}</div><div class="mt-1 text-white">${o.items}</div>${btn}${cancelBtn}</div></div>`;
+      });
+      document.getElementById('admin-container').innerHTML = h || '<h4 class="text-center mt-5">Queue Clear</h4>';
+    }
+    function openModal(t, a) { curToken = t; curAction = a; document.getElementById('customModal').style.display = 'block'; }
+    function closeModal() { document.getElementById('customModal').style.display = 'none'; }
+    function executeAction() {
+      let fn = curAction==='pay'?'confirmPayment':(curAction==='ready'?'notifyReady':(curAction==='cancel'?'cancelOrder':'markDelivered'));
+      google.script.run.withSuccessHandler(() => { closeModal(); load(); refreshStats(); })[fn](curToken);
+    }
+  </script>
+</body>
+</html>
