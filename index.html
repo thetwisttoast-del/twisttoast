@@ -38,6 +38,9 @@
   </div></div>
 
   <script>
+    // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUIXKc8ZCKdfXIGS4BGkipNSEHcyY1YznJE_Jp3qzxXdotZwKofXGhTLgLU6QrBXsf/exec";
+    
     var UPI_ID = "yespay.bizsbiz121539@yesbankltd";
     var menuData = [], cart = {}, pollInterval;
 
@@ -47,9 +50,20 @@
         document.getElementById('app-container').innerHTML = saved;
         if (savedToken) startPolling(savedToken);
       } else {
-        google.script.run.withSuccessHandler(showMenu).withFailureHandler(() => { document.getElementById('loadTxt').innerText="Error: Check Spreadsheet name"; }).getMenu();
+        fetchMenu();
       }
     };
+
+    // New API call to fetch menu from Google Sheets
+    function fetchMenu() {
+      fetch(`${SCRIPT_URL}?action=getMenu`)
+        .then(res => res.json())
+        .then(data => showMenu(data))
+        .catch(err => { 
+          console.error(err);
+          document.getElementById('loadTxt').innerText = "Error loading menu. Please refresh."; 
+        });
+    }
 
     function showMenu(data) {
       if (!data || data.length === 0) { document.getElementById('menu-list').innerHTML = "<h4>Menu Empty</h4>"; return; }
@@ -78,33 +92,79 @@
       document.getElementById('confirmModal').style.display = 'block';
     }
 
-    function proceedOrder() {
+    // New API call to submit orders to Google Sheets
+    async function proceedOrder() {
       closeConfirmModal();
-      var name = document.getElementById('studentName').value.trim(), phone = document.getElementById('studentPhone').value.trim(), method = document.getElementById('payMethod').value;
+      var name = document.getElementById('studentName').value.trim(), 
+          phone = document.getElementById('studentPhone').value.trim(), 
+          method = document.getElementById('payMethod').value;
+      
       var total = 0, summaryHtml = "", itemsList = [];
-      for (var k in cart) { if (cart[k] > 0) { total += cart[k] * menuData[k].price; itemsList.push(cart[k] + "x " + menuData[k].name); summaryHtml += "<li>" + cart[k] + "x " + menuData[k].name + "</li>"; } }
+      for (var k in cart) { 
+        if (cart[k] > 0) { 
+          total += cart[k] * menuData[k].price; 
+          itemsList.push(cart[k] + "x " + menuData[k].name); 
+          summaryHtml += "<li>" + cart[k] + "x " + menuData[k].name + "</li>"; 
+        } 
+      }
+
       if (method === "UPI") retryUPI(total);
       document.getElementById('mainBtn').innerText = "Processing...";
-      google.script.run.withSuccessHandler(token => {
+
+      const orderData = { name: name, phone: phone, items: itemsList.join(", "), total: total, method: method };
+
+      try {
+        const response = await fetch(SCRIPT_URL, {
+          method: "POST",
+          body: JSON.stringify(orderData)
+        });
+
+        const result = await response.json();
+        const token = result.token;
+
         var retryBtn = (method === "UPI") ? `<button onclick="retryUPI(${total})" class="btn btn-outline-warning w-100 mt-3" style="color:#D6B15A; border-color:#D6B15A;">Retry Payment</button>` : '';
         var successHtml = `<div class="container text-center py-4"><div class="token-card shadow p-4">
-          <h3 class="text-warning fw-bold">ORDER RECEIVED</h3><span class="token-number">#${token}</span>
-          <div class="text-start p-3 rounded-3 mt-4" style="color:#D6B15A; border:1px solid #3A2B1C; background:#0B0B0B">
-            <strong>Name: <span style="color:#fff">${name}</span></strong><br>
-            <strong>Status: <span id="stTxt" style="color:#fff">Waiting for Verification</span></strong><br>
-            <ul class="mt-2">${summaryHtml}</ul><strong>Total: ₹${total}</strong>
-          </div>${retryBtn}<button onclick="clearCache()" class="btn-gold mt-4 w-100">New Order</button></div></div>`;
-        localStorage.setItem('lastTokenHtml', successHtml); localStorage.setItem('activeToken', token); localStorage.setItem('tokenTimestamp', new Date().getTime());
-        document.getElementById('app-container').innerHTML = successHtml; startPolling(token);
-      }).processOrder({ name: name, phone: phone, items: itemsList.join(", "), total: total, method: method });
+              <h3 class="text-warning fw-bold">ORDER RECEIVED</h3><span class="token-number">#${token}</span>
+              <div class="text-start p-3 rounded-3 mt-4" style="color:#D6B15A; border:1px solid #3A2B1C; background:#0B0B0B">
+                <strong>Name: <span style="color:#fff">${name}</span></strong><br>
+                <strong>Status: <span id="stTxt" style="color:#fff">Waiting for Verification</span></strong><br>
+                <ul class="mt-2">${summaryHtml}</ul><strong>Total: ₹${total}</strong>
+              </div>${retryBtn}<button onclick="clearCache()" class="btn-gold mt-4 w-100">New Order</button></div></div>`;
+
+        localStorage.setItem('lastTokenHtml', successHtml); 
+        localStorage.setItem('activeToken', token); 
+        localStorage.setItem('tokenTimestamp', new Date().getTime());
+        document.getElementById('app-container').innerHTML = successHtml; 
+        startPolling(token);
+      } catch (error) {
+        console.error(error);
+        alert("Error: Check internet and try again.");
+        document.getElementById('mainBtn').innerText = "Select Items";
+      }
     }
 
     function retryUPI(amt) { window.location.href = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=TWIST%20TOAST&am=${amt}&cu=INR`; }
-    function startPolling(t) { pollInterval = setInterval(() => { google.script.run.withSuccessHandler(s => { if(document.getElementById('stTxt')) document.getElementById('stTxt').innerText = s; if(s==="Ready") showReady(t); if(s==="Delivered") clearCache(); }).checkOrderStatus(t); }, 15000); }
+
+    // API Polling to check status from Sheet
+    function startPolling(t) { 
+      pollInterval = setInterval(() => { 
+        fetch(`${SCRIPT_URL}?action=checkStatus&token=${t}`)
+          .then(res => res.text())
+          .then(s => {
+             if(document.getElementById('stTxt')) document.getElementById('stTxt').innerText = s; 
+             if(s==="Ready") showReady(t); 
+             if(s==="Delivered") clearCache();
+          });
+      }, 15000); 
+    }
+
     function showReady(t) {
       var readyHtml = `<div class="container text-center py-5"><div class="token-card ready-state shadow p-4"><h1>✅</h1><h2 class="fw-bold" style="color:#fff">FOOD IS READY!</h2><span class="token-number" style="color:#fff">#${t}</span><button onclick="clearCache()" class="btn btn-light mt-4 fw-bold">ORDER AGAIN</button></div></div>`;
-      document.getElementById('app-container').innerHTML = readyHtml; new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play(); localStorage.setItem('lastTokenHtml', readyHtml);
+      document.getElementById('app-container').innerHTML = readyHtml; 
+      new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg').play(); 
+      localStorage.setItem('lastTokenHtml', readyHtml);
     }
+    
     function clearCache() { if (pollInterval) clearInterval(pollInterval); localStorage.clear(); location.reload(); }
   </script>
 </body>
