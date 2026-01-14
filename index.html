@@ -70,15 +70,23 @@
 
     function showMenu(data) {
       if (!data || data.length === 0) { document.getElementById('menu-list').innerHTML = "<h4>Menu Empty</h4>"; return; }
-      menuData = data; var html = '';
+      menuData = data; 
+      var html = '';
       data.forEach((item, i) => {
-        html += `<div class="menu-item d-flex justify-content-between align-items-center">
-          <div><div class="fw-bold">${item.name}</div><div class="price-tag">₹${item.price}</div></div>
-          <div class="d-flex align-items-center gap-2">
-            <button class="qty-btn" onclick="updateQty(${i}, -1)">-</button><span id="qty-${i}">0</span><button class="qty-btn" onclick="updateQty(${i}, 1)">+</button>
-          </div></div>`;
+        if (item.stock > 0) {
+          html += `<div class="menu-item d-flex justify-content-between align-items-center">
+            <div>
+              <div class="fw-bold">${item.name}</div>
+              <div class="price-tag">₹${item.price} <span class="badge bg-secondary ms-2">${item.stock} left</span></div>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <button class="qty-btn" onclick="updateQty(${i}, -1)">-</button>
+              <span id="qty-${i}">0</span>
+              <button class="qty-btn" onclick="updateQty(${i}, 1)">+</button>
+            </div></div>`;
+        }
       });
-      document.getElementById('menu-list').innerHTML = html;
+      document.getElementById('menu-list').innerHTML = html || '<h4 class="text-center mt-5">Everything is Out of Stock!</h4>';
     }
 
     function updateQty(i, c) {
@@ -111,14 +119,24 @@
         } 
       }
 
-      // Logic updated to only trigger UPI app if UPI is selected
       if (method === "UPI") {
         retryUPI(total);
       }
 
       document.getElementById('mainBtn').innerText = "Processing...";
 
-      const orderData = { name: name, phone: phone, items: itemsList.join(", "), total: total, method: method };
+      // Updated orderData to include structured cartItems for inventory management
+      const orderData = { 
+        name: name, 
+        phone: phone, 
+        items: itemsList.join(", "), 
+        total: total, 
+        method: method,
+        cartItems: itemsList.map(it => ({ 
+          name: it.split('x ')[1], 
+          qty: parseInt(it.split('x ')[0]) 
+        })) 
+      };
 
       try {
         const response = await fetch(SCRIPT_URL, {
@@ -129,7 +147,6 @@
         const result = await response.json();
         const token = result.token;
 
-        // Display retry button ONLY for UPI orders
         var retryBtn = (method === "UPI") ? `<button onclick="retryUPI(${total})" class="btn btn-outline-warning w-100 mt-3" style="color:#D6B15A; border-color:#D6B15A;">Retry Payment</button>` : '';
         
         var successHtml = `<div class="container text-center py-4"><div class="token-card shadow p-4">
