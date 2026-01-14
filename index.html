@@ -24,10 +24,16 @@
   <div id="app-container">
     <div class="header-section"><img src="https://i.postimg.cc/QxvSm9mc/Twist-Toast.jpg" class="logo-img" alt="Logo"><h4 class="mb-0">TWIST & TOAST</h4></div>
     <div class="container mt-3" id="menu-list"><div class="text-center p-5"><h4 id="loadTxt">Loading Menu...</h4></div></div>
+    
     <div class="footer-bar">
       <input type="text" id="studentName" class="form-control mb-2" placeholder="TAP TO ENTER NAME">
       <input type="tel" id="studentPhone" class="form-control mb-2" placeholder="PHONE NUMBER">
-      <select id="payMethod" class="form-select mb-3" style="background:#0B0B0B; color:#D6B15A; border:1px solid #B08A3A;"><option value="UPI">Pay via UPI</option></select>
+      
+      <select id="payMethod" class="form-select mb-3" style="background:#0B0B0B; color:#D6B15A; border:1px solid #B08A3A;">
+        <option value="UPI">Pay via UPI</option>
+        <option value="Cash">Cash at Counter</option>
+      </select>
+      
       <button onclick="handleOrder()" id="mainBtn" class="btn btn-warning w-100 fw-bold" disabled style="background:#D6B15A; color:#000;">Select Items</button>
     </div>
   </div>
@@ -38,9 +44,7 @@
   </div></div>
 
   <script>
-    // PASTE YOUR GOOGLE APPS SCRIPT WEB APP URL HERE
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUIXKc8ZCKdfXIGS4BGkipNSEHcyY1YznJE_Jp3qzxXdotZwKofXGhTLgLU6QrBXsf/exec";
-    
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUIXKc8ZCKdfXIGS4BGkipNSEHcyY1YznJE_Jp3qzxXdotZwKofXGhTLgLU6QrBXsf/exec"; // Ensure this matches your deployment URL
     var UPI_ID = "yespay.bizsbiz121539@yesbankltd";
     var menuData = [], cart = {}, pollInterval;
 
@@ -54,7 +58,6 @@
       }
     };
 
-    // New API call to fetch menu from Google Sheets
     function fetchMenu() {
       fetch(`${SCRIPT_URL}?action=getMenu`)
         .then(res => res.json())
@@ -86,13 +89,13 @@
 
     function closeModal() { document.getElementById('customModal').style.display = 'none'; }
     function closeConfirmModal() { document.getElementById('confirmModal').style.display = 'none'; }
+    
     function handleOrder() {
       if (!document.getElementById('studentName').value.trim()) { document.getElementById('customModal').style.display = 'block'; return; }
       if (!/^[0-9]{10}$/.test(document.getElementById('studentPhone').value.trim())) { alert("Valid Phone Required"); return; }
       document.getElementById('confirmModal').style.display = 'block';
     }
 
-    // New API call to submit orders to Google Sheets
     async function proceedOrder() {
       closeConfirmModal();
       var name = document.getElementById('studentName').value.trim(), 
@@ -108,7 +111,11 @@
         } 
       }
 
-      if (method === "UPI") retryUPI(total);
+      // Logic updated to only trigger UPI app if UPI is selected
+      if (method === "UPI") {
+        retryUPI(total);
+      }
+
       document.getElementById('mainBtn').innerText = "Processing...";
 
       const orderData = { name: name, phone: phone, items: itemsList.join(", "), total: total, method: method };
@@ -122,12 +129,15 @@
         const result = await response.json();
         const token = result.token;
 
+        // Display retry button ONLY for UPI orders
         var retryBtn = (method === "UPI") ? `<button onclick="retryUPI(${total})" class="btn btn-outline-warning w-100 mt-3" style="color:#D6B15A; border-color:#D6B15A;">Retry Payment</button>` : '';
+        
         var successHtml = `<div class="container text-center py-4"><div class="token-card shadow p-4">
               <h3 class="text-warning fw-bold">ORDER RECEIVED</h3><span class="token-number">#${token}</span>
               <div class="text-start p-3 rounded-3 mt-4" style="color:#D6B15A; border:1px solid #3A2B1C; background:#0B0B0B">
                 <strong>Name: <span style="color:#fff">${name}</span></strong><br>
                 <strong>Status: <span id="stTxt" style="color:#fff">Waiting for Verification</span></strong><br>
+                <strong>Method: <span style="color:#fff">${method}</span></strong><br>
                 <ul class="mt-2">${summaryHtml}</ul><strong>Total: ₹${total}</strong>
               </div>${retryBtn}<button onclick="clearCache()" class="btn-gold mt-4 w-100">New Order</button></div></div>`;
 
@@ -145,7 +155,6 @@
 
     function retryUPI(amt) { window.location.href = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=TWIST%20TOAST&am=${amt}&cu=INR`; }
 
-    // API Polling to check status from Sheet
     function startPolling(t) { 
       pollInterval = setInterval(() => { 
         fetch(`${SCRIPT_URL}?action=checkStatus&token=${t}`)
@@ -169,5 +178,3 @@
   </script>
 </body>
 </html>
-
-
