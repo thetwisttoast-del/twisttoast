@@ -12,7 +12,21 @@
     .price-tag { color: #8A6A2E; font-weight: bold; font-size: 0.95rem; }
     .qty-btn { width: 35px; height: 35px; border-radius: 50%; border: 1px solid #B08A3A; background: transparent; color: #D6B15A; font-weight: bold; }
     .footer-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #171717; padding: 15px 20px 25px 20px; border-top: 2px solid #B08A3A; z-index: 1000; box-shadow: 0 -10px 25px rgba(0,0,0,0.9); }
-    .form-control { background: #0B0B0B !important; border: 2px solid #D6B15A !important; color: #FFFFFF !important; font-weight: bold; font-size: 16px !important; }
+    
+    /* UPDATED: Visibility fixes for input fields */
+    .form-control { 
+      background: #0B0B0B !important; 
+      border: 2px solid #D6B15A !important; 
+      color: #FFFFFF !important; 
+      font-weight: bold; 
+      font-size: 16px !important; 
+    }
+    
+    /* NEW: Makes "TAP TO ENTER NAME" and "PHONE NUMBER" bright white */
+    .form-control::placeholder {
+      color: #FFFFFF !important;
+      opacity: 0.9; 
+    }
     .token-card { background: #171717; border: 2px solid #B08A3A; border-radius: 20px; padding: 30px; }
     .token-number { font-size: 3.5rem; font-weight: 900; color: #D6B15A; display: block; letter-spacing: 2px; }
     #customModal, #confirmModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 10000; }
@@ -44,7 +58,7 @@
   </div></div>
 
   <script>
-    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUIXKc8ZCKdfXIGS4BGkipNSEHcyY1YznJE_Jp3qzxXdotZwKofXGhTLgLU6QrBXsf/exec"; // Ensure this matches your deployment URL
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzUIXKc8ZCKdfXIGS4BGkipNSEHcyY1YznJE_Jp3qzxXdotZwKofXGhTLgLU6QrBXsf/exec"; 
     var UPI_ID = "yespay.bizsbiz121539@yesbankltd";
     var menuData = [], cart = {}, pollInterval;
 
@@ -125,7 +139,6 @@
 
       document.getElementById('mainBtn').innerText = "Processing...";
 
-      // Updated orderData to include structured cartItems for inventory management
       const orderData = { 
         name: name, 
         phone: phone, 
